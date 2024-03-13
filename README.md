@@ -40,3 +40,11 @@
   
 
 11. **Environment Variable Usage:** The code uses env() to access environment variables (ADMIN_ROLE_ID and SUPERADMIN_ROLE_ID). Instead of accessing the admin and super admin like this, they should have been defined in the User model.
+
+
+12. **No comments:** I have not seen any comments neither in Controller nor in Repository that makes hard for new developer to understand the code especially the complex scenarios.
+
+
+The BookingRepository.php file contains more than 2000 lines of code that I think could be shorten to few hundred lines. I did not have enough time to go through all of the functions of this file. I only touched the few ones that are being used by BookingController. But the issues I found were almost similar in all of the functions. With proper structure, logic and right use of eloquent queries the file would hardly goes to few hundred lines.
+
+In light of above mentioned points, this code is terrible.
