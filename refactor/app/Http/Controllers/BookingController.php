@@ -35,17 +35,27 @@ class BookingController extends Controller
      */
     public function index(Request $request)
     {
-        if($user_id = $request->get('user_id')) {
+        // Issues Found
+        // $user_id was not defined
+        // Assignment operator was used in IF statement instead of a Logical Operator
+        // $response was not declared outside of the conditional statements and it was being returned outside the conditional statements
+        // Response data is being returned in 2 different forms.
+        // No exception handling was implemented
+        // Instead of storing ADMIN_ROLE_ID and SUPERADMIN_ROLE_ID in env file, they should be defined in User model
 
-            $response = $this->repository->getUsersJobs($user_id);
+        try{
+            $user = Auth::user();
 
+            if($user->isAdmin() || $user->isSuperAdmin()){
+                return response($this->repository->getAll($user));
+            }
+            else{
+                return response($this->repository->getUsersJobs($user->id));
+            }
         }
-        elseif($request->__authenticatedUser->user_type == env('ADMIN_ROLE_ID') || $request->__authenticatedUser->user_type == env('SUPERADMIN_ROLE_ID'))
-        {
-            $response = $this->repository->getAll($request);
+        catch(\Exception $e){
+            return response()->json(['error' => $e->getMessage()], 500);
         }
-
-        return response($response);
     }
 
     /**
@@ -54,9 +64,23 @@ class BookingController extends Controller
      */
     public function show($id)
     {
-        $job = $this->repository->with('translatorJobRel.user')->find($id);
+        // ISSUES FOUND
+        // There was no exception handling for errors
+        // The returned reponse was not properly handled
 
-        return response($job);
+        try{
+            $job = $this->repository->with('translatorJobRel.user')->find($id);
+
+            if($job){
+                return response()->json(['job'=>$job], 200);
+            }
+            else{
+                return response()->json(['job'=>'No job found'], 404);
+            }
+        }
+        catch(\Exception $e){
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
     /**
@@ -65,12 +89,33 @@ class BookingController extends Controller
      */
     public function store(Request $request)
     {
-        $data = $request->all();
+        // ISSUES FOUND
+        // No request validation was implemented
+        // There was no exception handling for errors
+        // The returned reponse was not properly handled
 
-        $response = $this->repository->store($request->__authenticatedUser, $data);
+        try{
+ 
+            $user = Auth::user();
 
-        return response($response);
+            $data = $request->validate([
+                'from_language_id' => 'required',
+                'immediate' => 'required',
+                'due_date' => 'required_if:immediate,no',
+                'due_time' => 'required_if:immediate,no',
+                'customer_phone_type' => 'required_if:immediate,no',
+                'duration' => 'required',
 
+                
+            ]);
+
+            $response = $this->repository->store($user, $data);
+
+            return response()->json(['message' => 'Record Added Successfully', 'response' => $response], 200);
+        }
+        catch(\Exception $e){
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
     /**
@@ -78,13 +123,32 @@ class BookingController extends Controller
      * @param Request $request
      * @return mixed
      */
-    public function update($id, Request $request)
+    public function update(Request $request, $id)
     {
-        $data = $request->all();
-        $cuser = $request->__authenticatedUser;
-        $response = $this->repository->updateJob($id, array_except($data, ['_token', 'submit']), $cuser);
+        // ISSUES FOUND
+        // update function parameters order
+        // No request validation was implemented
+        // There was no exception handling for errors
+        // The returned reponse was not properly handled
+        // $cuser was not the appropriate variable name
+        // php's array_except was used
 
-        return response($response);
+        try{
+ 
+            $user = Auth::user();
+
+            $data = $request->validate([
+                // Validation rules for the request data
+            ]);
+            $data = $request->except(['_token', 'submit']);
+
+            $response = $this->repository->updateJob($id, $data, $user);
+
+            return response()->json(['message' => 'Record Updated Successfully', 'response' => $response], 200);
+        }
+        catch(\Exception $e){
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
     /**
@@ -93,12 +157,24 @@ class BookingController extends Controller
      */
     public function immediateJobEmail(Request $request)
     {
-        $adminSenderEmail = config('app.adminemail');
-        $data = $request->all();
-
-        $response = $this->repository->storeJobEmail($data);
-
-        return response($response);
+        // ISSUES FOUND
+        // $adminSenderEmail was declared but used anywhere
+        // There was no exception handling for errors
+        // The returned reponse was not properly handled
+        
+        try {
+            $data = $request->validate([
+                // Define validation rules for the request data
+            ]);
+    
+            $response = $this->repository->storeJobEmail($data);
+    
+            return response()->json(['message' => 'Email sent successfully'], 200);
+        } 
+        catch (\Exception $e) {
+            return response()->json(['error' =>  $e->getMessage()], 500);
+        }
+        
     }
 
     /**
@@ -107,13 +183,27 @@ class BookingController extends Controller
      */
     public function getHistory(Request $request)
     {
-        if($user_id = $request->get('user_id')) {
+        // Issues Found
+        // $user_id was not defined
+        // Assignment operator was used in IF statement instead of a Logical Operator
+        // The returned reponse was not properly handled
+        // Exception handling was not implemented in case of errors
 
-            $response = $this->repository->getUsersJobsHistory($user_id, $request);
-            return response($response);
+        try {
+            $userId = $request->get('user_id');
+    
+            if ($userId) {
+                $response = $this->repository->getUsersJobsHistory($userId, $request);
+                return response()->json(['response' => $response], 200);
+            } 
+            else {
+                return response()->json(['error' => 'Provided a valid user id'], 400);
+            }
+        } 
+        catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
         }
 
-        return null;
     }
 
     /**
@@ -122,22 +212,43 @@ class BookingController extends Controller
      */
     public function acceptJob(Request $request)
     {
-        $data = $request->all();
-        $user = $request->__authenticatedUser;
+        // Issues Found
+        // Authenticated user was not properly accessed
+        // The returned reponse was not properly handled
+        // Exception handling was not implemented in case of errors
 
-        $response = $this->repository->acceptJob($data, $user);
-
-        return response($response);
+        try {
+            $user = Auth::user();
+            $data = $request->all();
+    
+            $response = $this->repository->acceptJob($data, $user);
+    
+            return response()->json(['message' => 'Job accepted successfully', 'response', $response], 200);
+        } 
+        catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
     public function acceptJobWithId(Request $request)
     {
-        $data = $request->get('job_id');
-        $user = $request->__authenticatedUser;
+        // Issues Found
+        // Authenticated user was not properly accessed
+        // The returned reponse was not properly handled
+        // Exception handling was not implemented in case of errors
+        // Variable name $data was appropriate for job_id
 
-        $response = $this->repository->acceptJobWithId($data, $user);
-
-        return response($response);
+        try {
+            $jobId = $request->input('job_id');
+            $user = Auth::user();
+    
+            $response = $this->repository->acceptJobWithId($jobId, $user);
+    
+            return response()->json(['message' => 'Job accepted successfully', 'response' => $response], 200);
+        } 
+        catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
     /**
@@ -146,12 +257,22 @@ class BookingController extends Controller
      */
     public function cancelJob(Request $request)
     {
-        $data = $request->all();
-        $user = $request->__authenticatedUser;
+        // Issues Found
+        // Authenticated user was not properly accessed
+        // The returned reponse was not properly handled
+        // Exception handling was not implemented in case of errors
 
-        $response = $this->repository->cancelJobAjax($data, $user);
-
-        return response($response);
+        try {
+            $data = $request->all();
+            $user = Auth::user();
+    
+            $response = $this->repository->cancelJobAjax($data, $user);
+    
+            return response()->json(['message' => 'Job has been canceled', 'response' => $response], 200);
+        } 
+        catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
     /**
@@ -160,22 +281,40 @@ class BookingController extends Controller
      */
     public function endJob(Request $request)
     {
-        $data = $request->all();
+        // Issues Found
+        // The returned reponse was not properly handled
+        // Exception handling was not implemented in case of errors
 
-        $response = $this->repository->endJob($data);
-
-        return response($response);
+        try {
+            $data = $request->all();
+    
+            $response = $this->repository->endJob($data);
+    
+            return response()->json(['response' => $response], 200);
+        } 
+        catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
 
     }
 
     public function customerNotCall(Request $request)
     {
-        $data = $request->all();
+        // Issues Found
+        // The returned reponse was not properly handled
+        // Exception handling was not implemented in case of errors
+        // Inappropriate function name        
 
-        $response = $this->repository->customerNotCall($data);
-
-        return response($response);
-
+        try {
+            $data = $request->all();
+    
+            $response = $this->repository->customerNotCall($data);
+    
+            return response()->json(['response' => $response], 200);
+        } 
+        catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
     /**
@@ -184,92 +323,116 @@ class BookingController extends Controller
      */
     public function getPotentialJobs(Request $request)
     {
-        $data = $request->all();
-        $user = $request->__authenticatedUser;
+        // Issues Found
+        // $data variable was declared but not used anywhere
+        // Authenticated user was not properly accessed
+        // The returned reponse was not properly handled
+        // Exception handling was not implemented in case of errors
 
-        $response = $this->repository->getPotentialJobs($user);
-
-        return response($response);
+        try {
+            $user = Auth::user();
+    
+            $jobs = $this->repository->getPotentialJobs($user);
+    
+            return response()->json(['jobs' => $jobs], 200);
+        } 
+        catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
     public function distanceFeed(Request $request)
     {
-        $data = $request->all();
+        // ISSUES FOUND
+        // Data was not validated
+        // Unnecessary if-else statements
+        // Boolean values were compared with string 'true' or 'false' instead of actual boolean true or false
+        // $job_id is required for both queries at the end but $job_id was not a required field
+        // There was no exeption handling
+        // Inconsistent request variable (admincomment) and db field names (admin_comments)
 
-        if (isset($data['distance']) && $data['distance'] != "") {
-            $distance = $data['distance'];
-        } else {
-            $distance = "";
-        }
-        if (isset($data['time']) && $data['time'] != "") {
-            $time = $data['time'];
-        } else {
-            $time = "";
-        }
-        if (isset($data['jobid']) && $data['jobid'] != "") {
-            $jobid = $data['jobid'];
-        }
+        try {
 
-        if (isset($data['session_time']) && $data['session_time'] != "") {
-            $session = $data['session_time'];
-        } else {
-            $session = "";
-        }
+            $validated = $request->validate([
+                'distance' => 'string',
+                'time' => 'string',
+                'job_id' => 'required|exists:jobs,id',
+                'session_time' => 'string',
+                'flagged' => 'required|boolean',
+                'manually_handled' => 'required|boolean',
+                'by_admin' => 'required|boolean',
+                'admin_comments' => 'required_if:flagged,true',
+            ]);
 
-        if ($data['flagged'] == 'true') {
-            if($data['admincomment'] == '') return "Please, add comment";
-            $flagged = 'yes';
-        } else {
-            $flagged = 'no';
-        }
-        
-        if ($data['manually_handled'] == 'true') {
-            $manually_handled = 'yes';
-        } else {
-            $manually_handled = 'no';
-        }
+            $updateDistanceData = [
+                'distance' => $validated['distance'] ?? '',
+                'time' => $validated['time'] ?? '',
+            ];
 
-        if ($data['by_admin'] == 'true') {
-            $by_admin = 'yes';
-        } else {
-            $by_admin = 'no';
-        }
-
-        if (isset($data['admincomment']) && $data['admincomment'] != "") {
-            $admincomment = $data['admincomment'];
-        } else {
-            $admincomment = "";
-        }
-        if ($time || $distance) {
-
-            $affectedRows = Distance::where('job_id', '=', $jobid)->update(array('distance' => $distance, 'time' => $time));
+            $updateJobData = [
+                'admin_comments' => $validated['admin_comments'] ?? '',
+                'flagged' => $validated['flagged'] ? 'yes' : 'no',
+                'session_time' => $validated['session_time'] ?? '',
+                'manually_handled' => $validated['manually_handled'] ? 'yes' : 'no',
+                'by_admin' => $validated['by_admin'] ? 'yes' : 'no',
+            ];
+    
+            Distance::where('job_id', $validated['job_id'])->update($updateDistanceData);
+            Job::where('id', $validated['job_id'])->update($updateJobData);
+            
+            return response()->json(['message' => 'Record has been updated!'], 200);
+        } 
+        catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
         }
 
-        if ($admincomment || $session || $flagged || $manually_handled || $by_admin) {
-
-            $affectedRows1 = Job::where('id', '=', $jobid)->update(array('admin_comments' => $admincomment, 'flagged' => $flagged, 'session_time' => $session, 'manually_handled' => $manually_handled, 'by_admin' => $by_admin));
-
-        }
-
-        return response('Record updated!');
     }
 
     public function reopen(Request $request)
     {
-        $data = $request->all();
-        $response = $this->repository->reopen($data);
+        // Issues Found
+        // The returned reponse was not properly handled
+        // Exception handling was not implemented in case of errors
 
-        return response($response);
+        try {
+            $data = $request->all();
+    
+            $response = $this->repository->reopen($data);
+    
+            return response()->json(['response' => $response], 200);
+        } 
+        catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
     public function resendNotifications(Request $request)
     {
-        $data = $request->all();
-        $job = $this->repository->find($data['jobid']);
-        $job_data = $this->repository->jobToData($job);
-        $this->repository->sendNotificationTranslator($job, $job_data, '*');
+        // Issues Found
+        // The returned reponse was not properly handled
+        // Exception handling was not implemented in case of errors
 
-        return response(['success' => 'Push sent']);
+        try {
+            $data = $request->all();
+    
+            $job = $this->repository->find($data['job_id']);
+
+            $jobData = $this->repository->jobToData($job);
+            $this->repository->sendNotificationTranslator($job, $jobData, '*');
+    
+            return response()->json(['success'=>true, 'message' => 'Notification has been sent'], 200);
+        } 
+        catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+
+
+        // $data = $request->all();
+        // $job = $this->repository->find($data['jobid']);
+        // $job_data = $this->repository->jobToData($job);
+        // $this->repository->sendNotificationTranslator($job, $job_data, '*');
+
+        // return response(['success' => 'Push sent']);
     }
 
     /**
@@ -279,15 +442,20 @@ class BookingController extends Controller
      */
     public function resendSMSNotifications(Request $request)
     {
-        $data = $request->all();
-        $job = $this->repository->find($data['jobid']);
-        $job_data = $this->repository->jobToData($job);
+        // Issues Found
+        // In response success was being sent for both success and error response
 
         try {
+            $data = $request->all();
+            $job = $this->repository->find($data['job_id']);
+            
+            $this->repository->jobToData($job);
             $this->repository->sendSMSNotificationToTranslator($job);
-            return response(['success' => 'SMS sent']);
-        } catch (\Exception $e) {
-            return response(['success' => $e->getMessage()]);
+
+            return response(['success' => true, 'message'=> 'SMS has been sent']);
+        } 
+        catch (\Exception $e) {
+            return response(['error' => $e->getMessage()]);
         }
     }
 
